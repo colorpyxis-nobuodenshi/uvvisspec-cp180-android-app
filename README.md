@@ -1,2 +1,2 @@
-# uvvisspec cp150 app
-UVVIS分光放射照度計CP150アプリ
+# uvvisspec cp180 app
+UVabc分光放射照度計CP180アプリ
