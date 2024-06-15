@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:collection';
+import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:rxdart/rxdart.dart';
@@ -43,12 +44,13 @@ class HomeState extends State<Home> {
   var _peekWavelength = 0.0;
   var _irradiance = 0.0;
   var _accumulatedIrradiance = 0.0;
-  final Queue<double> _irradianceQueue = Queue();
+  //final Queue<double> _irradianceQueue = Queue();
   var _integ = 1;
   late List<double> _spectralData = List.generate(50, (index) => 1.0);
   late List<double> _spectralWl = List.generate(50, (index) => 0.0);
   late ResultReport _currentResult = ResultReport();
   late StreamSubscription<Object> _resultStreamSubscription;
+  late StreamSubscription<Object> _resultAccumulatedIrradiaceStreamSubscription;
   var _settings = Settings();
   var _showWarning = true;
   var _measuring = false;
@@ -64,13 +66,13 @@ class HomeState extends State<Home> {
       var ir1 = _currentResult.ir;
       var pwl1 = _currentResult.pwl;
       //var ai = _currentResult.ai;
-      if(_irradianceQueue.length == _integ) {
-        _irradianceQueue.removeFirst();
-      }
-      _irradianceQueue.add(ir1);
-      var ai = _irradianceQueue.length == _integ ? 
-        _irradianceQueue.reduce((value, element) => value + element) : 
-        0.0;
+      // if(_irradianceQueue.length == _integ) {
+      //   _irradianceQueue.removeFirst();
+      // }
+      // _irradianceQueue.add(ir1);
+      // var ai = _irradianceQueue.length == _integ ? 
+      //   _irradianceQueue.reduce((value, element) => value + element) : 
+      //   0.0;
       
       for (var i = 0; i < p1.length; i++) {
         p1[i] /= pp1;
@@ -81,9 +83,16 @@ class HomeState extends State<Home> {
         _irradiance = ir1 * 100;
         _peekWavelength = pwl1;
         //_peekPower = pp1;
-        _accumulatedIrradiance = ai * 100;
+        //_accumulatedIrradiance = ai * 100;
       });
   }
+
+  void callbackResulltAccumulatedIrradiance(double value) async {
+    setState(() {
+      _accumulatedIrradiance = value * 100;
+    });
+  }
+
   @override
   void initState() async {
     super.initState();
@@ -124,37 +133,9 @@ class HomeState extends State<Home> {
         _showWarning = false;
       });
     });
-    // device.resultStream.listen((event) async {
-    //   _currentResult = await resultConverter.execute(_settings, event);
-
-    //   var p1 = [..._currentResult.sp];
-    //   var wl1 = [..._currentResult.wl];
-    //   var pp1 = _currentResult.pp;
-    //   var ir1 = _currentResult.ir;
-    //   var pwl1 = _currentResult.pwl;
-    //   //var ai = _currentResult.ai;
-    //   if(_irradianceQueue.length == _integ) {
-    //     _irradianceQueue.removeFirst();
-    //   }
-    //   _irradianceQueue.add(ir1);
-    //   var ai = _irradianceQueue.length == _integ ? 
-    //     _irradianceQueue.reduce((value, element) => value + element) : 
-    //     0.0;
-      
-    //   for (var i = 0; i < p1.length; i++) {
-    //     p1[i] /= pp1;
-    //   }
-    //   setState(() {
-    //     _spectralData = p1;
-    //     _spectralWl = wl1;
-    //     _irradiance = ir1 * 100;
-    //     _peekWavelength = pwl1;
-    //     //_peekPower = pp1;
-    //     _accumulatedIrradiance = ai * 100;
-    //   });
-    // });
 
     _resultStreamSubscription = device.resultAverageStream.listen(callbackResult);
+    _resultAccumulatedIrradiaceStreamSubscription = device.getResultAccumulatedIrradianceStream(_integ).listen(callbackResulltAccumulatedIrradiance);
 
     await device.initialize();
   }
@@ -164,6 +145,7 @@ class HomeState extends State<Home> {
     super.dispose();
     await device.deinitialize();
     _resultStreamSubscription.cancel();
+    _resultAccumulatedIrradiaceStreamSubscription.cancel();
     SystemNavigator.pop();
   }
 
@@ -197,10 +179,10 @@ class HomeState extends State<Home> {
                 await device.changeExposureTime(_settings.deviceExposureTime);
               }
 
-              _irradianceQueue.clear();
-
               await device.measStart();
               _resultStreamSubscription = device.resultAverageStream.listen(callbackResult);
+              _resultAccumulatedIrradiaceStreamSubscription.cancel();
+              _resultAccumulatedIrradiaceStreamSubscription = device.getResultAccumulatedIrradianceStream(_integ).listen(callbackResulltAccumulatedIrradiance);
             },
           ),
         ],
@@ -399,9 +381,6 @@ class HomeState extends State<Home> {
 
                       Navigator.of(context).pop();
                     }
-
-                    _irradianceQueue.clear();
-
                     await device.measStart();
                   },
                   child: const Text("DARK"),
@@ -419,9 +398,6 @@ class HomeState extends State<Home> {
                       await device.measStop();
                       return;
                     }
-
-                    _irradianceQueue.clear();
-
                     await device.measStart();
                   },
                   child: !_measuring ? const Text("MEAS") : const Text("HOLD"),

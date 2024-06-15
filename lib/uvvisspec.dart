@@ -357,8 +357,8 @@ class UvVisSpecDevice {
 
   List<List<double>> _correct(List<double> wl, List<double> sp)
   {
-    var wlMax = 800;
-    var wlMin = 330;
+    var wlMax = 440;
+    var wlMin = 200;
     var len = wlMax - wlMin + 1;
     var wl2 = List.generate(len, (index) => (index + wlMin).toDouble());
     var sp2 = List.generate(len, (index) => 0.0);
@@ -490,11 +490,20 @@ class UvVisSpecDevice {
 
 }
 
+extension UvVisSpecDeviceAccumulatedIrradianceExtention on UvVisSpecDevice {
+  Stream<double> getResultAccumulatedIrradianceStream(int integrationTime) {
+    return resultAverageStream.bufferCount(integrationTime, 1).flatMap((value) {
+      return Future(() async {
+        return value.map((e) => e.ir).reduce((value, element) => value + element);
+      }).asStream();
+    });
+  }
+}
+
 extension UvVisSpecDeviceExtention on UvVisSpecDevice {
   
   Stream<UVVisSpecDeviceResult> get resultAverageStream {
-    //return _resultSubject.stream.bufferCount(5, 1).flatMap((value) => average(value).asStream());
-    return _resultSubject.stream.bufferCount(5, 1).flatMap((value) {
+    return _resultSubject.stream.bufferCount(3, 1).flatMap((value) {
       return Future(() async {
         var splist = value.map((e) => e.sp).toList();
         var len = splist.first.length;
